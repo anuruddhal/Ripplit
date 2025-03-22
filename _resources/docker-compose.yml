@@ -8,3 +8,9 @@ services:
     ports:
       - "3001:3001"
     network_mode: "host"
+
+  sentiment-analysis:
+    image: "wso2/sentiment-api:0.0.1"
+    ports:
+      - "9098:9098"
+    network_mode: "host"
