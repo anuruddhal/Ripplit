@@ -29,7 +29,6 @@ public type NewPost record {|
     string category;
 |};
 
-
 type Probability record {
     decimal neg;
     decimal neutral;
@@ -41,10 +40,21 @@ type Sentiment record {
     string label;
 };
 
+type PostWithMeta record {
+    int id;
+    string description;
+    string author;
+    record {|
+        string[] tags;
+        string category;
+        time:Civil createdTimeStamp;
+
+    |} meta;
+};
 
 table<User> key(id) usersTable = table [
-    {id: 0, name: "Alice", birthDate: {day: 20,month: 5, year: 1990}, mobileNumber: "0771234567"},
-    {id: 1, name: "Bob", birthDate: {day: 15,month: 7, year: 1985}, mobileNumber: "0777654321"}
+    {id: 0, name: "Alice", birthDate: {day: 20, month: 5, year: 1990}, mobileNumber: "0771234567"},
+    {id: 1, name: "Bob", birthDate: {day: 15, month: 7, year: 1985}, mobileNumber: "0777654321"}
 ];
 
 table<Post> key(id) postsTable = table [];
@@ -80,15 +90,16 @@ service /socialmedia on new http:Listener(9095) {
         return http:NOT_FOUND;
     }
 
-    resource function get posts() returns Post[]|error {
-        Post[] allUserPosts = [];
+    resource function get posts() returns PostWithMeta[]|error {
+        PostWithMeta[] allUserPosts = [];
         foreach User user in usersTable {
             Post[] userPosts = from Post post in postsTable
                 where post.userId == user.id
                 select post;
 
             foreach Post post in userPosts {
-                allUserPosts.push(post);
+                PostWithMeta postWithMeta= mapPostToPostwithMeta(post, user.name);
+                allUserPosts.push(postWithMeta);
             }
         }
         return allUserPosts;
