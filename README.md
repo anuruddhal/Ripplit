@@ -26,13 +26,15 @@ type SocialMedia service object {
 };
 ```
 
-Following are the features covered by the scenario.
+## Tasks
+1. Define types for application.
+2. Implement the social media service `users` endpoint with in memory table.
 
+
+Following are the features covered by the scenario.
+- Define Ballerina Types
 - Writing REST APIs with verbs, URLs, data
-- Debugging Ballerina programs
-- HTTP client
-- Accessing databases
-- Configurability
+
 
 ## Setup environment
 
