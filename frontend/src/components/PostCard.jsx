@@ -25,7 +25,8 @@ import Chip from "@mui/material/Chip";
 import Avatar from "@mui/material/Avatar";
 
 export default function PostCard({ data }) {
-  const { description, tags, category, createdTimeStamp } = data;
+  const { author, description } = data;
+  const { tags, category, createdTimeStamp } = data.meta;
 
   let hashtagsArr = [];
   if (Array.isArray(tags)) {
@@ -61,7 +62,7 @@ export default function PostCard({ data }) {
               component="span"
               sx={{ textTransform: "capitalize", wordSpacing: "0", }}
             >
-              {/* {author}{" "} */}
+              {author}{" "}
             </Typography>
             &middot; {createdTimeStamp?.year}-{createdTimeStamp?.month}-{createdTimeStamp?.day}   {createdTimeStamp?.hour}:{createdTimeStamp?.minute}
           </Typography>
