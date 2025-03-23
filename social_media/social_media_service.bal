@@ -1,10 +1,17 @@
 import ballerina/http;
+import ballerina/sql;
 import ballerina/time;
 
 public type User record {|
     readonly int id;
     string name;
+    @sql:Column {
+        name: "birth_date"
+    }
     time:Date birthDate;
+    @sql:Column {
+        name: "mobile_number"
+    }
     string mobileNumber;
 |};
 
@@ -20,6 +27,9 @@ public type Post record {|
     string description;
     string tags;
     string category;
+    @sql:Column {
+        name: "created_time_stamp"
+    }
     time:Civil createdTimeStamp;
 |};
 
@@ -52,13 +62,6 @@ type PostWithMeta record {
     |} meta;
 };
 
-table<User> key(id) usersTable = table [
-    {id: 0, name: "Alice", birthDate: {day: 20, month: 5, year: 1990}, mobileNumber: "0771234567"},
-    {id: 1, name: "Bob", birthDate: {day: 15, month: 7, year: 1985}, mobileNumber: "0777654321"}
-];
-
-table<Post> key(id) postsTable = table [];
-
 @http:ServiceConfig {
     cors: {
         allowOrigins: ["*"]
@@ -67,23 +70,35 @@ table<Post> key(id) postsTable = table [];
 service /socialmedia on new http:Listener(9095) {
 
     resource function get users() returns User[]|error {
-        return usersTable.toArray();
+        stream<User, sql:Error?> userStream = socialMediaDb->query(`SELECT * FROM users`);
+        User[] users = check from User user in userStream
+            select user;
+        return users;
     }
 
     resource function post users(NewUser newUser) returns User|error {
-        int id = usersTable.length();
-        User user = {id: id, name: newUser.name, birthDate: newUser.birthDate, mobileNumber: newUser.mobileNumber};
-        usersTable.add(user);
-        return user;
+        sql:ExecutionResult|sql:Error result = check socialMediaDb->execute(`INSERT INTO users (name, birth_date, mobile_number) 
+        VALUES (${newUser.name}, ${newUser.birthDate}, ${newUser.mobileNumber})`);
+        if (result is sql:Error) {
+            return result;
+        }
+        return {id: <int>result.lastInsertId, name: newUser.name, birthDate: newUser.birthDate, mobileNumber: newUser.mobileNumber};
     }
 
     resource function delete users/[int id]() returns http:NoContent|error {
-        User? _ = usersTable.removeIfHasKey(id);
+        sql:ExecutionResult|sql:Error result = check socialMediaDb->execute(`DELETE FROM users WHERE id = ${id}`);
+        if (result is sql:Error) {
+            return result;
+        }
         return http:NO_CONTENT;
     }
 
     resource function get users/[int id]() returns User|http:NotFound|error {
-        User? user = usersTable.get(id);
+        User|error user = socialMediaDb->queryRow(`SELECT * FROM users WHERE id = ${id}`);
+        if (user is sql:NoRowsError) {
+            return http:NOT_FOUND;
+        }
+
         if (user is User) {
             return user;
         }
@@ -91,39 +106,40 @@ service /socialmedia on new http:Listener(9095) {
     }
 
     resource function get posts() returns PostWithMeta[]|error {
-        PostWithMeta[] allUserPosts = [];
-        foreach User user in usersTable {
-            Post[] userPosts = from Post post in postsTable
-                where post.userId == user.id
-                select post;
+        stream<User, sql:Error?> userStream = socialMediaDb->query(`SELECT * FROM users`);
+        PostWithMeta[] posts = [];
+        User[] users = check from User user in userStream
+            select user;
 
+        foreach User user in users {
+            stream<Post, sql:Error?> postStream = socialMediaDb->query(`SELECT id, description, category, created_time_stamp, tags FROM posts WHERE user_id = ${user.id}`);
+            Post[] userPosts = check from Post post in postStream
+                select post;
             foreach Post post in userPosts {
-                PostWithMeta postWithMeta= mapPostToPostwithMeta(post, user.name);
-                allUserPosts.push(postWithMeta);
+                PostWithMeta postsWithMeta = mapPostToPostwithMeta(post, user.name);
+                posts.push(postsWithMeta);
             }
         }
-        return allUserPosts;
+        return posts;
     }
 
     resource function post users/[int id]/posts(NewPost newPost) returns http:Created|http:NotFound|http:Forbidden|error {
-        User? user = usersTable.get(id);
-        if (user is User) {
-            Sentiment sentiment = check sentimentEp->/api/sentiment.post({text: newPost.description});
-            if (sentiment.label == "neg") {
-                return http:FORBIDDEN;
-            }
-            int postId = postsTable.length();
-            Post post = {
-                id: postId,
-                userId: id,
-                createdTimeStamp: time:utcToCivil(time:utcNow()),
-                description: newPost.description,
-                tags: newPost.tags,
-                category: newPost.category
-            };
-            postsTable.add(post);
-            return http:CREATED;
+        User|error user = socialMediaDb->queryRow(`SELECT * FROM users WHERE id = ${id}`);
+        if user is sql:NoRowsError {
+            return http:NOT_FOUND;
         }
-        return http:NOT_FOUND;
+        if user is error {
+            return user;
+        }
+
+        Sentiment sentiment = check sentimentEp->/api/sentiment.post({"text": newPost.description});
+        if sentiment.label == "neg" {
+            return http:FORBIDDEN;
+        }
+
+        _ = check socialMediaDb->execute(`
+            INSERT INTO posts(description, category, created_time_stamp, tags, user_id)
+            VALUES (${newPost.description}, ${newPost.category}, CURRENT_TIMESTAMP(), ${newPost.tags}, ${id});`);
+        return http:CREATED;
     }
 }
