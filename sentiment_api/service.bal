@@ -27,31 +27,27 @@ service /text\-processing on new http:Listener(9098) {
         log:printInfo("Sentiment analysis service started");
     }
 
-    resource function post api/sentiment(Post post) returns SentimentOk {
-        if post.text.includes("hate") {
-            return {
-                body: {
-                    "probability": { 
-                        "neg": 0.69864980238309449, 
-                        "neutral": 0.27119050546800266, 
-                        "pos": 0.30135019761690551
-                }, 
-                "label": "neg"
-                }
-            };
-        }
+    resource function post api/sentiment(Post post) returns SentimentOk|error {
+        SentimentAIOutput response = check analyseContext(post);
         return {
             body: {
-                "probability": { 
-                    "neg": 0.30135019761690551, 
-                    "neutral": 0.27119050546800266, 
-                    "pos": 0.69864980238309449
-                }, 
-                "label": "pos"
+                probability: {
+                    neg: response.neg,
+                    neutral: response.neutral,
+                    pos: response.pos
+                },
+                label: response.label
             }
         };
     }
 }
+
+type SentimentAIOutput record {|
+    decimal neg;
+    decimal neutral;
+    decimal pos;
+    string label;
+|};
 
 type Probability record {
     decimal neg;

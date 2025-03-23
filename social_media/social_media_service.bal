@@ -1,6 +1,7 @@
 import ballerina/http;
 import ballerina/sql;
 import ballerina/time;
+import ballerina/log;
 
 public type User record {|
     readonly int id;
@@ -133,6 +134,7 @@ service /socialmedia on new http:Listener(9095) {
         }
 
         Sentiment sentiment = check sentimentEp->/api/sentiment.post({"text": newPost.description});
+        log:printInfo("Sentiment: "+ sentiment.toJsonString());
         if sentiment.label == "neg" {
             return http:FORBIDDEN;
         }
