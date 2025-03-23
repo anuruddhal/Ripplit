@@ -10,7 +10,9 @@ services:
     network_mode: "host"
 
   sentiment-analysis:
-    image: "wso2/sentiment-api:0.0.1"
+    build:
+      context: sentiment_api
+      dockerfile: Dockerfile
     ports:
       - "9098:9098"
     network_mode: "host"
