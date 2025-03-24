@@ -9,7 +9,7 @@ services:
       - "3001:3001"
     network_mode: "host"
 
-  sentiment-analysis:
+  sentiment-analysis-ai:
     build:
       context: sentiment_api
       dockerfile: Dockerfile
